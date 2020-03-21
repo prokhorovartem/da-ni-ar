@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration monitorInterval="10">
+    <Properties>
+        <Property name="LOG_PATTERN_COMMON">
+            %d{dd.MM.yyyy HH:mm:ss.SSS} %-5level [%t] %logger{36} - %msg%n
+        </Property>
+    </Properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN_COMMON}"/>
+        </Console>
+        <File name="LoggerFile" fileName="logs/app.log">
+            <PatternLayout pattern="${LOG_PATTERN_COMMON}"/>
+        </File>
+        <Async name="Async">
+            <AppenderRef ref="LoggerFile"/>
+        </Async>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="Async"/>
+        </Root>
+        <Root level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="Async"/>
+        </Root>
+    </Loggers>
+</configuration>
