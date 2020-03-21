@@ -21,9 +21,9 @@
             <AppenderRef ref="Console"/>
             <AppenderRef ref="Async"/>
         </Root>
-        <Root level="DEBUG" additivity="false">
+        <Logger name="ru.ifmo.daniar" level="DEBUG">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="Async"/>
-        </Root>
+        </Logger>
     </Loggers>
 </configuration>

@@ -1,5 +1,6 @@
 package ru.ifmo.daniar.service;
 
+import lombok.extern.log4j.Log4j2;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.extensions.bots.commandbot.TelegramLongPollingCommandBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -7,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+@Log4j2
 public final class Bot extends TelegramLongPollingCommandBot {
 
     private static final String BOT_NAME = "Da Ni Ar";
