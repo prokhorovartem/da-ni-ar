@@ -17,13 +17,9 @@
         </Async>
     </Appenders>
     <Loggers>
-        <Root level="INFO">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="Async"/>
-        </Root>
         <Logger name="ru.ifmo.daniar" level="DEBUG">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="Async"/>
+<!--            <AppenderRef ref="LoggerFile"/>-->
         </Logger>
     </Loggers>
 </configuration>

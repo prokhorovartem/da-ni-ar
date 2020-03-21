@@ -9,8 +9,12 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import ru.ifmo.daniar.service.Bot;
 
 @Log4j2
-public class Application {
+public class Daniar {
     public static void main(String[] args) {
+        registerBot();
+    }
+
+    private static void registerBot() {
         ApiContextInitializer.init();
         TelegramBotsApi botsApi = new TelegramBotsApi();
         DefaultBotOptions botOptions = ApiContext.getInstance(DefaultBotOptions.class);
