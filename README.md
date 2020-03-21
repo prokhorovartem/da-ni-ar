@@ -1,5 +1,5 @@
 # DAniil-NIkita-ARtem = DA-NI-AR
-Bot meme maker
+ru.ifmo.daniar.service.Bot meme maker
 
 ### To build jar archive
 `mvn clean compile assembly:single`

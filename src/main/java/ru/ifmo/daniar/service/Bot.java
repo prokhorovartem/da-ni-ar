@@ -1,4 +1,5 @@
-import lombok.extern.slf4j.Slf4j;
+package ru.ifmo.daniar.service;
+
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.extensions.bots.commandbot.TelegramLongPollingCommandBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;

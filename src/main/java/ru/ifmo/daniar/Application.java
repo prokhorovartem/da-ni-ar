@@ -1,21 +1,24 @@
+package ru.ifmo.daniar;
+
+import lombok.extern.log4j.Log4j2;
 import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.ApiContext;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
+import ru.ifmo.daniar.service.Bot;
 
+@Log4j2
 public class Application {
     public static void main(String[] args) {
+        ApiContextInitializer.init();
+        TelegramBotsApi botsApi = new TelegramBotsApi();
+        DefaultBotOptions botOptions = ApiContext.getInstance(DefaultBotOptions.class);
+
         try {
-            ApiContextInitializer.init();
-
-            TelegramBotsApi botsApi = new TelegramBotsApi();
-
-            DefaultBotOptions botOptions = ApiContext.getInstance(DefaultBotOptions.class);
-
             botsApi.registerBot(new Bot(botOptions));
-
-        } catch (TelegramApiRequestException ignored) {
+        } catch (TelegramApiRequestException e) {
+            log.error("Error during registration bot: {}", e.getMessage());
         }
     }
 }

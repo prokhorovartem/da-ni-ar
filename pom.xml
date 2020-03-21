@@ -8,6 +8,13 @@
     <artifactId>daniar</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <properties>
+        <java.version>1.8</java.version>
+        <telegrambots.version>4.4.0.1</telegrambots.version>
+        <lombok.version>1.18.12</lombok.version>
+        <log4j.version>1.2.17</log4j.version>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
@@ -15,7 +22,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>Application</mainClass>
+                            <mainClass>ru.ifmo.daniar.Application</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
@@ -29,8 +36,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                 </configuration>
             </plugin>
         </plugins>
@@ -40,18 +47,23 @@
         <dependency>
             <groupId>org.telegram</groupId>
             <artifactId>telegrambots</artifactId>
-            <version>4.4.0.1</version>
+            <version>${telegrambots.version}</version>
         </dependency>
         <dependency>
             <groupId>org.telegram</groupId>
             <artifactId>telegrambotsextensions</artifactId>
-            <version>4.4.0.1</version>
+            <version>${telegrambots.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.12</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>${log4j.version}</version>
         </dependency>
     </dependencies>
 
