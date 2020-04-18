@@ -12,7 +12,7 @@ import ru.ifmo.daniar.service.Bot;
 public class Daniar {
     public static void main(String[] args) {
         registerBot();
-        System.out.println("Bot has stated");
+        System.out.println("Bot has started");
     }
 
     private static void registerBot() {

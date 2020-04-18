@@ -10,42 +10,48 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageTe
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.ifmo.daniar.model.ResponseType;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
-
 import java.io.IOException;
-import java.util.*;
 import java.util.List;
+import java.util.*;
 
 import static java.lang.System.getProperty;
+import static ru.ifmo.daniar.model.ResponseType.DESCRIPTION_RESPONSE;
+import static ru.ifmo.daniar.model.ResponseType.USER_RESPONSE;
 
 @Log4j2
 public final class Bot extends TelegramLongPollingCommandBot {
 
     private static final String BOT_NAME = "Da Ni Ar";
-    private static final String BOT_TOKEN = "token";
+    private static final String BOT_TOKEN = "961694457:AAHqGJsXMhT4j3RZ_CSd7sekQiS5jg1jry0";
     private static final String MODERATORS_CHAT_ID = "@daniar_moders";
     private static final String DESCRIPTIONS_FILE_NAME = "descriptions.txt";
-    private static final String TICK_BUTTON_CODE = "\u2705";
-    private static final String CROSS_BUTTON_CODE = "\u274C";
-    private static List<String> memes = Arrays.asList("Сасный Вампус", "Запомните твари... а то забудите.",
-            "Dr. Srars", "Подзезелья и гоблоны", "Миксаил Сольсе-Спайсович", "Я пить Грут", "Bruhforce", "У меня кончились сорцы");
+    private static final String AUTHORIZED_USERS_FILE_NAME = "authorizedUsers.txt";
+    private static final String TICK_BUTTON_DESCRIPTION_CODE = "\u2705";
+    private static final String TICK_BUTTON_USER_CODE = "\u2714";
+    private static final String CROSS_BUTTON_DESCRIPTION_CODE = "\u274C";
+    private static final String CROSS_BUTTON_USER_CODE = "\u2716";
+    private static List<String> memes;
 
     private ReplyKeyboardMarkup replyKeyboardMarkup;
     private List<KeyboardRow> menuKeyBoard;
     private List<KeyboardRow> cancelKeyBoard;
-    private Set<String> descriptions;
+    private Set<Integer> authorizedUsers;
 
     private boolean isWaitingForSignature = false;
     private boolean isWaitingForPhoto = false;
@@ -55,11 +61,25 @@ public final class Bot extends TelegramLongPollingCommandBot {
         replyKeyboardMarkup = createReplyKeyBoardMarkup();
         menuKeyBoard = createMenu();
         cancelKeyBoard = createCancelMenu();
-        descriptions = loadDescriptions();
+        memes = loadDescriptions();
+        authorizedUsers = loadAuthorizedUsers();
     }
 
-    private Set<String> loadDescriptions() {
-        Set<String> descriptions = new HashSet<>();
+    private Set<Integer> loadAuthorizedUsers() {
+        Set<Integer> authorizedUsers = new HashSet<>();
+        try (Scanner scanner = new Scanner(new File(AUTHORIZED_USERS_FILE_NAME))) {
+            while (scanner.hasNextInt()) {
+                authorizedUsers.add(scanner.nextInt());
+            }
+        } catch (FileNotFoundException e) {
+            log.error("{} file not found", AUTHORIZED_USERS_FILE_NAME, e);
+        }
+
+        return authorizedUsers;
+    }
+
+    private List<String> loadDescriptions() {
+        List<String> descriptions = new ArrayList<>();
         try (Scanner scanner = new Scanner(DESCRIPTIONS_FILE_NAME)) {
             while (scanner.hasNextLine()) {
                 descriptions.add(scanner.nextLine());
@@ -118,21 +138,50 @@ public final class Bot extends TelegramLongPollingCommandBot {
         log.debug("Message received: {}", update);
         Message inputMessage = update.getMessage();
 
-        if (update.getCallbackQuery() != null && checkUserName(update)) {
-            EditMessageText answer = createModerAnswer(update.getCallbackQuery());
-            executeToUser(answer);
+        CallbackQuery callbackQuery = update.getCallbackQuery();
+        if (callbackQuery != null && checkUserName(update)) {
+            if (isUserConfirmation(callbackQuery.getData())) {
+                EditMessageText answer = createModerAnswer(update.getCallbackQuery(), USER_RESPONSE);
+                executeToUser(answer);
+            } else {
+                EditMessageText answer = createModerAnswer(update.getCallbackQuery(), DESCRIPTION_RESPONSE);
+                executeToUser(answer);
+            }
         } else {
+            User user = update.getMessage().getFrom();
+            if (!authorizedUsers.contains(user.getId())) {
+                SendMessage userSuggestMessage;
+                if (user.getUserName() == null) {
+                    userSuggestMessage = createModerMsg(
+                            String.format("Добавить пользователя @%s (id %d) в список разрешенных?",
+                                    user.getFirstName(), user.getId()), USER_RESPONSE);
+                } else {
+                    userSuggestMessage = createModerMsg(
+                            String.format("Добавить пользователя %s (id %d) в список разрешенных?",
+                                    user.getUserName(), user.getId()), USER_RESPONSE);
+                }
+
+                executeToUser(userSuggestMessage);
+
+                executeToUser(new SendMessage(update.getMessage().getChatId(), "Вы не зарегистрированы. Дождитесь решения модераторов"));
+                return;
+            }
+
             PartialBotApiMethod<Message> answer = createMessage(inputMessage);
             executeToUser((SendMessage) answer);
         }
 
     }
 
+    private boolean isUserConfirmation(String data) {
+        return data.equals(TICK_BUTTON_USER_CODE) || data.equals(CROSS_BUTTON_USER_CODE);
+    }
+
     private boolean checkUserName(Update update) {
         return MODERATORS_CHAT_ID.replace("@", "").equals(update.getCallbackQuery().getMessage().getChat().getUserName());
     }
 
-    private EditMessageText createModerAnswer(CallbackQuery query) {
+    private EditMessageText createModerAnswer(CallbackQuery query, ResponseType descriptionResponse) {
         int messageId = query.getMessage().getMessageId();
         String text = query.getMessage().getText();
 
@@ -141,24 +190,63 @@ public final class Bot extends TelegramLongPollingCommandBot {
                 .setMessageId(messageId)
                 .setChatId(MODERATORS_CHAT_ID);
         String firstName = query.getFrom().getFirstName();
-        if (query.getData().equals(TICK_BUTTON_CODE)) {
-            String description = query.getMessage().getText();
-            addDescription(description);
-            writeDescription(description);
-            editMessageText.setText(String.format("%s\n%s - %s", text, TICK_BUTTON_CODE, firstName));
-        } else if (query.getData().equals(CROSS_BUTTON_CODE)) {
-            editMessageText.setText(String.format("%s\n%s - %s", text, CROSS_BUTTON_CODE, firstName));
+        if (descriptionResponse == DESCRIPTION_RESPONSE) {
+            if (query.getData().equals(TICK_BUTTON_DESCRIPTION_CODE)) {
+                String description = query.getMessage().getText();
+                addDescription(description);
+                writeDescription(description);
+                editMessageText.setText(String.format("%s\n%s - %s", text, TICK_BUTTON_DESCRIPTION_CODE, firstName));
+            } else if (query.getData().equals(CROSS_BUTTON_DESCRIPTION_CODE)) {
+                editMessageText.setText(String.format("%s\n%s - %s", text, CROSS_BUTTON_DESCRIPTION_CODE, firstName));
+            }
+        } else {
+            if (query.getData().equals(TICK_BUTTON_USER_CODE)) {
+                addUser(query);
+                editMessageText.setText(String.format("%s\n%s - %s", text, TICK_BUTTON_USER_CODE, firstName));
+            } else if (query.getData().equals(CROSS_BUTTON_USER_CODE)) {
+                editMessageText.setText(String.format("%s\n%s - %s", text, CROSS_BUTTON_USER_CODE, firstName));
+            }
         }
 
         return editMessageText;
     }
 
+    private void addUser(CallbackQuery query) {
+        String text = query.getMessage().getText().replace("@", "");
+        String userId = text.substring(text.indexOf("id") + 3, text.indexOf(")"));
+        authorizedUsers.add(Integer.parseInt(userId));
+
+        try (FileWriter writer = new FileWriter(AUTHORIZED_USERS_FILE_NAME)) {
+            writer.write(userId + "\n");
+        } catch (IOException e) {
+            log.error("Error during writing new userId", e);
+        }
+    }
+
+    private void addDescription(String description) {
+        memes.add(description);
+        try (FileWriter writer = new FileWriter(DESCRIPTIONS_FILE_NAME, true)) {
+            writer.write(description + "\n");
+        } catch (IOException e) {
+            log.error("Error during writing description", e);
+        }
+    }
+
+    private void writeDescription(String description) {
+        try (FileWriter fileWriter = new FileWriter(getProperty("user.dir") + DESCRIPTIONS_FILE_NAME, true)) {
+            fileWriter.write(description);
+        } catch (IOException e) {
+            log.error("Error occurred during writing description: {}", e.getMessage());
+        }
+    }
+
     private PartialBotApiMethod<Message> createMessage(Message inputMsg) {
         long chatId = inputMsg.getChatId();
+
         String inputMsgText = inputMsg.getText();
 
         if (isWaitingForSignature) {
-            SendMessage moderMsg = createModerMsg(inputMsgText);
+            SendMessage moderMsg = createModerMsg(inputMsgText, DESCRIPTION_RESPONSE);
             isWaitingForSignature = false;
             executeToUser(moderMsg);
             return createOutputMsg(
@@ -196,9 +284,9 @@ public final class Bot extends TelegramLongPollingCommandBot {
         return createOutputMsg(chatId, "Пришли мне фото", menuKeyBoard);
     }
 
-    private SendMessage createModerMsg(String inputMsgText) {
+    private SendMessage createModerMsg(String inputMsgText, ResponseType responseType) {
         SendMessage sendMessage = new SendMessage(MODERATORS_CHAT_ID, inputMsgText);
-        sendMessage.setReplyMarkup(createApprovingTable());
+        sendMessage.setReplyMarkup(createApprovingTable(responseType));
         return sendMessage;
     }
 
@@ -213,9 +301,9 @@ public final class Bot extends TelegramLongPollingCommandBot {
         return message.getPhoto() != null;
     }
 
-    private PartialBotApiMethod<Message> processMem(Message message){
+    private PartialBotApiMethod<Message> processMem(Message message) {
         try {
-            String joke = memes.get((int)(Math.random() * memes.size()));
+            String joke = memes.get((int) (Math.random() * memes.size()));
             File file = new File(message.getPhoto().get(0).getFileId());
             BufferedImage image = ImageIO.read(file);
             Graphics2D graphics = (Graphics2D) image.getGraphics();
@@ -226,34 +314,40 @@ public final class Bot extends TelegramLongPollingCommandBot {
             int centerY = image.getHeight() - (image.getWidth() / 20);
             graphics.drawString(joke, centerX, centerY);
             File sendFile = null;
-            ImageIO.write(image,"jpg",sendFile);
+            ImageIO.write(image, "jpg", sendFile);
             graphics.dispose();
             SendPhoto sendPhoto = new SendPhoto();
             sendPhoto.setChatId(message.getChatId());
             sendPhoto.setPhoto(sendFile);
             return sendPhoto;
-        } catch (IOException e){
-            return new SendMessage(message.getChatId(),"Не получилось открыть вашу картинку. Проверьте формат.");
+        } catch (IOException e) {
+            return new SendMessage(message.getChatId(), "Не получилось открыть вашу картинку. Проверьте формат.");
         }
     }
 
-    private SendMessage addMemDescription(Message message){
-        if(message.getText() != null && !message.getText().equals("")) {
+    private SendMessage addMemDescription(Message message) {
+        if (message.getText() != null && !message.getText().equals("")) {
             memes.add(message.getText());
             return new SendMessage(message.getChatId(), "Ваше описание было добвалено");
-        }
-        else return new SendMessage(message.getChatId(), "Вы ввели неправильное описание");
+        } else return new SendMessage(message.getChatId(), "Вы ввели неправильное описание");
     }
 
-    private ReplyKeyboard createApprovingTable() {
+    private ReplyKeyboard createApprovingTable(ResponseType responseType) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         InlineKeyboardButton inlineKeyboardButton1 = new InlineKeyboardButton();
         InlineKeyboardButton inlineKeyboardButton2 = new InlineKeyboardButton();
 
-        inlineKeyboardButton1.setText(TICK_BUTTON_CODE);
-        inlineKeyboardButton1.setCallbackData(TICK_BUTTON_CODE);
-        inlineKeyboardButton2.setText(CROSS_BUTTON_CODE);
-        inlineKeyboardButton2.setCallbackData(CROSS_BUTTON_CODE);
+        if (responseType == DESCRIPTION_RESPONSE) {
+            inlineKeyboardButton1.setText(TICK_BUTTON_DESCRIPTION_CODE);
+            inlineKeyboardButton1.setCallbackData(TICK_BUTTON_DESCRIPTION_CODE);
+            inlineKeyboardButton2.setText(CROSS_BUTTON_DESCRIPTION_CODE);
+            inlineKeyboardButton2.setCallbackData(CROSS_BUTTON_DESCRIPTION_CODE);
+        } else {
+            inlineKeyboardButton1.setText(TICK_BUTTON_USER_CODE);
+            inlineKeyboardButton1.setCallbackData(TICK_BUTTON_USER_CODE);
+            inlineKeyboardButton2.setText(CROSS_BUTTON_USER_CODE);
+            inlineKeyboardButton2.setCallbackData(CROSS_BUTTON_USER_CODE);
+        }
 
         List<InlineKeyboardButton> keyboardButtonsRow = new ArrayList<>(Arrays.asList(
                 inlineKeyboardButton1,
