@@ -12,6 +12,7 @@ import ru.ifmo.daniar.service.Bot;
 public class Daniar {
     public static void main(String[] args) {
         registerBot();
+        System.out.println("Bot has stated");
     }
 
     private static void registerBot() {
@@ -22,7 +23,7 @@ public class Daniar {
         try {
             botsApi.registerBot(new Bot(botOptions));
         } catch (TelegramApiRequestException e) {
-            log.error("Error during registration bot: {}", e.getMessage());
+            log.error("Error during registration bot: ", e);
         }
     }
 }
