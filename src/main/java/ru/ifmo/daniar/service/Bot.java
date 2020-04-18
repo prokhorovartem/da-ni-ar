@@ -22,16 +22,21 @@ import java.awt.*;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileWriter;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
+
+import static java.lang.System.getProperty;
 
 @Log4j2
 public final class Bot extends TelegramLongPollingCommandBot {
 
     private static final String BOT_NAME = "Da Ni Ar";
-    private static final String BOT_TOKEN = "961694457:AAHrgGPDkBsvWzQ-mNWQr9smAzzx9j8XKaI";
+    private static final String BOT_TOKEN = "token";
     private static final String MODERATORS_CHAT_ID = "@daniar_moders";
+    private static final String DESCRIPTIONS_FILE_NAME = "descriptions.txt";
     private static final String TICK_BUTTON_CODE = "\u2705";
     private static final String CROSS_BUTTON_CODE = "\u274C";
     private static List<String> memes = Arrays.asList("Сасный Вампус", "Запомните твари... а то забудите.",
@@ -40,10 +45,7 @@ public final class Bot extends TelegramLongPollingCommandBot {
     private ReplyKeyboardMarkup replyKeyboardMarkup;
     private List<KeyboardRow> menuKeyBoard;
     private List<KeyboardRow> cancelKeyBoard;
-    private Set<String> descriptions = new HashSet<>(Arrays.asList(
-            "blabla",
-            "ablabla"
-    ));
+    private Set<String> descriptions;
 
     private boolean isWaitingForSignature = false;
     private boolean isWaitingForPhoto = false;
@@ -53,6 +55,18 @@ public final class Bot extends TelegramLongPollingCommandBot {
         replyKeyboardMarkup = createReplyKeyBoardMarkup();
         menuKeyBoard = createMenu();
         cancelKeyBoard = createCancelMenu();
+        descriptions = loadDescriptions();
+    }
+
+    private Set<String> loadDescriptions() {
+        Set<String> descriptions = new HashSet<>();
+        try (Scanner scanner = new Scanner(DESCRIPTIONS_FILE_NAME)) {
+            while (scanner.hasNextLine()) {
+                descriptions.add(scanner.nextLine());
+            }
+        }
+
+        return descriptions;
     }
 
     private ReplyKeyboardMarkup createReplyKeyBoardMarkup() {
@@ -102,9 +116,7 @@ public final class Bot extends TelegramLongPollingCommandBot {
     @Override
     public void processNonCommandUpdate(Update update) {
         log.debug("Message received: {}", update);
-
         Message inputMessage = update.getMessage();
-
 
         if (update.getCallbackQuery() != null && checkUserName(update)) {
             EditMessageText answer = createModerAnswer(update.getCallbackQuery());
@@ -130,7 +142,9 @@ public final class Bot extends TelegramLongPollingCommandBot {
                 .setChatId(MODERATORS_CHAT_ID);
         String firstName = query.getFrom().getFirstName();
         if (query.getData().equals(TICK_BUTTON_CODE)) {
-            descriptions.add(query.getMessage().getText());
+            String description = query.getMessage().getText();
+            addDescription(description);
+            writeDescription(description);
             editMessageText.setText(String.format("%s\n%s - %s", text, TICK_BUTTON_CODE, firstName));
         } else if (query.getData().equals(CROSS_BUTTON_CODE)) {
             editMessageText.setText(String.format("%s\n%s - %s", text, CROSS_BUTTON_CODE, firstName));
@@ -147,7 +161,10 @@ public final class Bot extends TelegramLongPollingCommandBot {
             SendMessage moderMsg = createModerMsg(inputMsgText);
             isWaitingForSignature = false;
             executeToUser(moderMsg);
-            return new SendMessage(chatId, "Подпись отправлена на рассмотрение!\nПришли мне следующую фотографию!");
+            return createOutputMsg(
+                    chatId,
+                    "Подпись отправлена на рассмотрение!\nПришли мне следующую фотографию!",
+                    menuKeyBoard);
         }
 
         if (hasPhotoInside(inputMsg)) {
