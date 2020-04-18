@@ -25,7 +25,7 @@ import static java.lang.System.getProperty;
 public final class Bot extends TelegramLongPollingCommandBot {
 
     private static final String BOT_NAME = "Da Ni Ar";
-    private static final String BOT_TOKEN = "961694457:AAFEw6Ihju2URnUypxZ0JRmVqAfEEMbbB9U";
+    private static final String BOT_TOKEN = "token";
     private static final String MODERATORS_CHAT_ID = "@daniar_moders";
     private static final String DESCRIPTIONS_FILE_NAME = "descriptions.txt";
     private static final String TICK_BUTTON_CODE = "\u2705";
