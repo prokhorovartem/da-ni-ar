@@ -3,7 +3,9 @@ package ru.ifmo.daniar.service;
 import lombok.extern.log4j.Log4j2;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.extensions.bots.commandbot.TelegramLongPollingCommandBot;
+import org.telegram.telegrambots.meta.api.methods.PartialBotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -15,9 +17,16 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.FileWriter;
+
 import java.io.IOException;
 import java.util.*;
+import java.util.List;
 
 import static java.lang.System.getProperty;
 
@@ -30,6 +39,8 @@ public final class Bot extends TelegramLongPollingCommandBot {
     private static final String DESCRIPTIONS_FILE_NAME = "descriptions.txt";
     private static final String TICK_BUTTON_CODE = "\u2705";
     private static final String CROSS_BUTTON_CODE = "\u274C";
+    private static List<String> memes = Arrays.asList("Сасный Вампус", "Запомните твари... а то забудите.",
+            "Dr. Srars", "Подзезелья и гоблоны", "Миксаил Сольсе-Спайсович", "Я пить Грут", "Bruhforce", "У меня кончились сорцы");
 
     private ReplyKeyboardMarkup replyKeyboardMarkup;
     private List<KeyboardRow> menuKeyBoard;
@@ -111,8 +122,8 @@ public final class Bot extends TelegramLongPollingCommandBot {
             EditMessageText answer = createModerAnswer(update.getCallbackQuery());
             executeToUser(answer);
         } else {
-            SendMessage answer = createMessage(inputMessage);
-            executeToUser(answer);
+            PartialBotApiMethod<Message> answer = createMessage(inputMessage);
+            executeToUser((SendMessage) answer);
         }
 
     }
@@ -142,24 +153,7 @@ public final class Bot extends TelegramLongPollingCommandBot {
         return editMessageText;
     }
 
-    private void addDescription(String description) {
-        descriptions.add(description);
-        try (FileWriter writer = new FileWriter(DESCRIPTIONS_FILE_NAME, true)) {
-            writer.write(description + "\n");
-        } catch (IOException e) {
-            log.error("Error during writing description", e);
-        }
-    }
-
-    private void writeDescription(String description) {
-        try (FileWriter fileWriter = new FileWriter(getProperty("user.dir") + DESCRIPTIONS_FILE_NAME, true)) {
-            fileWriter.write(description);
-        } catch (IOException e) {
-            log.error("Error occurred during writing description: {}", e.getMessage());
-        }
-    }
-
-    private SendMessage createMessage(Message inputMsg) {
+    private PartialBotApiMethod<Message> createMessage(Message inputMsg) {
         long chatId = inputMsg.getChatId();
         String inputMsgText = inputMsg.getText();
 
@@ -174,7 +168,7 @@ public final class Bot extends TelegramLongPollingCommandBot {
         }
 
         if (hasPhotoInside(inputMsg)) {
-            SendMessage mem = processMem(inputMsg);
+            PartialBotApiMethod<Message> mem = processMem(inputMsg);
             log.debug("Mem has created for user: {}", inputMsg.getFrom().getId());
             isWaitingForPhoto = false;
             return mem;
@@ -219,9 +213,36 @@ public final class Bot extends TelegramLongPollingCommandBot {
         return message.getPhoto() != null;
     }
 
-    private SendMessage processMem(Message message) {
-        //TODO: do mem
-        return new SendMessage(message.getChatId(), "Заглушка");
+    private PartialBotApiMethod<Message> processMem(Message message){
+        try {
+            String joke = memes.get((int)(Math.random() * memes.size()));
+            File file = new File(message.getPhoto().get(0).getFileId());
+            BufferedImage image = ImageIO.read(file);
+            Graphics2D graphics = (Graphics2D) image.getGraphics();
+            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+            FontMetrics fontMetrics = graphics.getFontMetrics();
+            Rectangle2D rect = fontMetrics.getStringBounds(joke, graphics);
+            int centerX = (image.getWidth() - (int) rect.getWidth()) / 2;
+            int centerY = image.getHeight() - (image.getWidth() / 20);
+            graphics.drawString(joke, centerX, centerY);
+            File sendFile = null;
+            ImageIO.write(image,"jpg",sendFile);
+            graphics.dispose();
+            SendPhoto sendPhoto = new SendPhoto();
+            sendPhoto.setChatId(message.getChatId());
+            sendPhoto.setPhoto(sendFile);
+            return sendPhoto;
+        } catch (IOException e){
+            return new SendMessage(message.getChatId(),"Не получилось открыть вашу картинку. Проверьте формат.");
+        }
+    }
+
+    private SendMessage addMemDescription(Message message){
+        if(message.getText() != null && !message.getText().equals("")) {
+            memes.add(message.getText());
+            return new SendMessage(message.getChatId(), "Ваше описание было добвалено");
+        }
+        else return new SendMessage(message.getChatId(), "Вы ввели неправильное описание");
     }
 
     private ReplyKeyboard createApprovingTable() {
