@@ -323,27 +323,36 @@ public final class Bot extends TelegramLongPollingCommandBot {
                     .max(Comparator.comparing(PhotoSize::getFileSize))
                     .orElse(null);
             if (photo != null) {
-                File file = downloadFile(Objects.requireNonNull(getFilePath(photo)));
-                BufferedImage image = ImageIO.read(file);
-                Graphics2D graphics = (Graphics2D) image.getGraphics();
-                graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
-                FontMetrics fontMetrics = graphics.getFontMetrics();
-                Rectangle2D rect = fontMetrics.getStringBounds(joke, graphics);
-                int centerX = (image.getWidth() - (int) rect.getWidth()) / 2;
-                int centerY = image.getHeight() - (image.getWidth() / 20);
-                graphics.drawString(joke, centerX, centerY);
-                File sendFile = new File("image.jpg");
-                ImageIO.write(image, "jpg", sendFile);
-                graphics.dispose();
-                SendPhoto sendPhoto = new SendPhoto();
-                sendPhoto.setChatId(message.getChatId());
-                sendPhoto.setPhoto(sendFile);
-                return sendPhoto;
+                if(photo.getHeight() < 500)
+                    return new SendMessage(message.getChatId(), "Не получилось открыть вашу картинку. Слишком маленькая ширина");
+                else {
+                    File file = downloadFile(Objects.requireNonNull(getFilePath(photo)));
+                        SendPhoto resultPhoto = signImage(file,message,joke);
+                        return resultPhoto;
+                }
             }
         } catch (IOException | TelegramApiException e) {
             return new SendMessage(message.getChatId(), "Не получилось открыть вашу картинку. Проверьте формат.");
         }
         return null;
+    }
+
+    private SendPhoto signImage(File file, Message message, String joke) throws IOException{
+        BufferedImage image = ImageIO.read(file);
+        Graphics2D graphics = (Graphics2D) image.getGraphics();
+        graphics.setFont(new Font("Lobster", Font.BOLD, 53));
+        FontMetrics fontMetrics = graphics.getFontMetrics();
+        Rectangle2D rect = fontMetrics.getStringBounds(joke, graphics);
+        int centerX = (image.getWidth() - (int) rect.getWidth()) / 2;
+        int centerY = image.getHeight() - (image.getWidth() / 20);
+        graphics.drawString(joke, centerX, centerY);
+        File sendFile = new File("image.jpg");
+        ImageIO.write(image, "jpg", sendFile);
+        graphics.dispose();
+        SendPhoto sendPhoto = new SendPhoto();
+        sendPhoto.setChatId(message.getChatId());
+        sendPhoto.setPhoto(sendFile);
+        return sendPhoto;
     }
 
     public String getFilePath(PhotoSize photo) {
