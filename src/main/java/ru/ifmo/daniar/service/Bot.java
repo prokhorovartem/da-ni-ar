@@ -3,14 +3,12 @@ package ru.ifmo.daniar.service;
 import lombok.extern.log4j.Log4j2;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.extensions.bots.commandbot.TelegramLongPollingCommandBot;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.PartialBotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -27,6 +25,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.List;
 import java.util.*;
 
@@ -38,7 +39,7 @@ import static ru.ifmo.daniar.model.ResponseType.USER_RESPONSE;
 public final class Bot extends TelegramLongPollingCommandBot {
 
     private static final String BOT_NAME = "Da Ni Ar";
-    private static final String BOT_TOKEN = "961694457:AAHqGJsXMhT4j3RZ_CSd7sekQiS5jg1jry0";
+    private static final String BOT_TOKEN = "961694457:AAHOgJxhxmdjYLHqhn4T66UKZqKYH9Ss0hw";
     private static final String MODERATORS_CHAT_ID = "@daniar_moders";
     private static final String DESCRIPTIONS_FILE_NAME = "descriptions.txt";
     private static final String AUTHORIZED_USERS_FILE_NAME = "authorizedUsers.txt";
@@ -125,6 +126,14 @@ public final class Bot extends TelegramLongPollingCommandBot {
         }
     }
 
+    private void executeToUser(SendPhoto message) {
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error during sending message: {}", e.getMessage());
+        }
+    }
+
     private void executeToUser(EditMessageText message) {
         try {
             execute(message);
@@ -168,7 +177,11 @@ public final class Bot extends TelegramLongPollingCommandBot {
             }
 
             PartialBotApiMethod<Message> answer = createMessage(inputMessage);
-            executeToUser((SendMessage) answer);
+            if (answer instanceof SendPhoto) {
+                executeToUser((SendPhoto) answer);
+            } else {
+                executeToUser((SendMessage) answer);
+            }
         }
 
     }
@@ -304,25 +317,53 @@ public final class Bot extends TelegramLongPollingCommandBot {
     private PartialBotApiMethod<Message> processMem(Message message) {
         try {
             String joke = memes.get((int) (Math.random() * memes.size()));
-            File file = new File(message.getPhoto().get(0).getFileId());
-            BufferedImage image = ImageIO.read(file);
-            Graphics2D graphics = (Graphics2D) image.getGraphics();
-            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
-            FontMetrics fontMetrics = graphics.getFontMetrics();
-            Rectangle2D rect = fontMetrics.getStringBounds(joke, graphics);
-            int centerX = (image.getWidth() - (int) rect.getWidth()) / 2;
-            int centerY = image.getHeight() - (image.getWidth() / 20);
-            graphics.drawString(joke, centerX, centerY);
-            File sendFile = null;
-            ImageIO.write(image, "jpg", sendFile);
-            graphics.dispose();
-            SendPhoto sendPhoto = new SendPhoto();
-            sendPhoto.setChatId(message.getChatId());
-            sendPhoto.setPhoto(sendFile);
-            return sendPhoto;
-        } catch (IOException e) {
+            PhotoSize photo = message.getPhoto().stream()
+                    .max(Comparator.comparing(PhotoSize::getFileSize))
+                    .orElse(null);
+            if (photo != null) {
+                File file = downloadFile(Objects.requireNonNull(getFilePath(photo)));
+                BufferedImage image = ImageIO.read(file);
+                Graphics2D graphics = (Graphics2D) image.getGraphics();
+                graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+                FontMetrics fontMetrics = graphics.getFontMetrics();
+                Rectangle2D rect = fontMetrics.getStringBounds(joke, graphics);
+                int centerX = (image.getWidth() - (int) rect.getWidth()) / 2;
+                int centerY = image.getHeight() - (image.getWidth() / 20);
+                graphics.drawString(joke, centerX, centerY);
+                File sendFile = new File("image.jpg");
+                ImageIO.write(image, "jpg", sendFile);
+                graphics.dispose();
+                SendPhoto sendPhoto = new SendPhoto();
+                sendPhoto.setChatId(message.getChatId());
+                sendPhoto.setPhoto(sendFile);
+                return sendPhoto;
+            }
+        } catch (IOException | TelegramApiException e) {
             return new SendMessage(message.getChatId(), "Не получилось открыть вашу картинку. Проверьте формат.");
         }
+        return null;
+    }
+
+    public String getFilePath(PhotoSize photo) {
+        Objects.requireNonNull(photo);
+
+        if (photo.hasFilePath()) { // If the file_path is already present, we are done!
+            return photo.getFilePath();
+        } else { // If not, let find it
+            // We create a GetFile method and set the file_id from the photo
+            GetFile getFileMethod = new GetFile();
+            getFileMethod.setFileId(photo.getFileId());
+            try {
+                // We execute the method using AbsSender::execute method.
+                org.telegram.telegrambots.meta.api.objects.File file = execute(getFileMethod);
+                // We now have the file_path
+                return file.getFilePath();
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null; // Just in case
     }
 
     private SendMessage addMemDescription(Message message) {
