@@ -81,10 +81,12 @@ public final class Bot extends TelegramLongPollingCommandBot {
 
     private List<String> loadDescriptions() {
         List<String> descriptions = new ArrayList<>();
-        try (Scanner scanner = new Scanner(DESCRIPTIONS_FILE_NAME)) {
+        try (Scanner scanner = new Scanner(new File(DESCRIPTIONS_FILE_NAME))) {
             while (scanner.hasNextLine()) {
                 descriptions.add(scanner.nextLine());
             }
+        } catch (FileNotFoundException e) {
+            log.error("Error during loading descriptions", e);
         }
 
         return descriptions;
